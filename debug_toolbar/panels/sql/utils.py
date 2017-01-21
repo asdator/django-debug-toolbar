@@ -6,18 +6,22 @@ import sqlparse
 from django.utils.html import escape
 from sqlparse import tokens as T
 
+UNREPRESENTABLE_STRING = 'TOO_BIG_TO_REPRESENT'
 
 class BoldKeywordFilter:
     """sqlparse filter to bold SQL keywords"""
     def process(self, stream):
-        """Process the token stream"""
-        for token_type, value in stream:
-            is_keyword = token_type in T.Keyword
-            if is_keyword:
-                yield T.Text, '<strong>'
-            yield token_type, escape(value)
-            if is_keyword:
-                yield T.Text, '</strong>'
+        try:
+            """Process the token stream"""
+            for token_type, value in stream:
+                is_keyword = token_type in T.Keyword
+                if is_keyword:
+                    yield T.Text, '<strong>'
+                yield token_type, escape(value)
+                if is_keyword:
+                    yield T.Text, '</strong>'
+        except MemoryError:
+            yield T.Text, '<strong>%s</strong>' % UNREPRESENTABLE_STRING
 
 
 def reformat_sql(sql):

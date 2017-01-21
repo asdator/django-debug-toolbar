@@ -69,6 +69,63 @@ class SQLPanelTestCase(BaseTestCase):
         # ensure the panel renders correctly
         self.assertIn('café', self.panel.content)
 
+    def test_long_singleword_query(self):
+        """
+        #Test related to Issue #909
+        https://github.com/jazzband/django-debug-toolbar/issues/909
+
+        If django-debug-toolbar is used
+        with a module such as django-picklefield
+        (https://github.com/gintas/django-picklefield)
+        it will be very easy to generate a INSERT/UPDATE query
+        containing a very long word (base64 encoded data structure).
+
+        When django-debug-toolbar tries to represent it
+        a MemoryError can be caused by the sqlparse's REGEX
+        https://github.com/andialbrecht/sqlparse/blob/0.2.2/sqlparse/lexer.py#L59
+
+        So when this happen we just want to stop the repsentation of this word.
+
+        In order to make a test that will fails on every machine, a temporal
+        Memory Limit will be set during the test.
+        """
+
+        short_word = 'y' * 10
+        very_long_word = 'x' * (1024 * 1024)
+
+        #now set memory_limits
+        import psutil
+        process = psutil.Process()
+        memory_resource = psutil.RLIMIT_AS
+        memory_usage = process.memory_info().vms
+        current_memory_limit = process.rlimit(memory_resource)
+        current_soft, current_hard = current_memory_limit
+
+        leave_free_memory = 50 * 1024 * 1024 #20MB
+        max_memory_limit = memory_usage+leave_free_memory
+
+        #set soft memory limit
+        process.rlimit(memory_resource, (max_memory_limit, current_hard))
+
+        self.assertEqual(len(self.panel._queries), 0)
+
+        list(User.objects.filter(username=short_word))
+        self.assertEqual(len(self.panel._queries), 1)
+
+        list(User.objects.filter(username=very_long_word))
+        self.assertEqual(len(self.panel._queries), 2)
+
+        self.panel.process_response(self.request, self.response)
+        self.panel.generate_stats(self.request, self.response)
+
+        #restore the original memory limits
+        process.rlimit(memory_resource, (current_soft, current_hard))
+
+        # ensure the panel renders correctly
+        from debug_toolbar.panels.sql.utils import UNREPRESENTABLE_STRING
+        self.assertTrue(short_word in self.panel.content)
+        self.assertTrue(UNREPRESENTABLE_STRING in self.panel.content)
+
     def test_insert_content(self):
         """
         Test that the panel only inserts content after generate_stats and
