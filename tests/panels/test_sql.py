@@ -91,7 +91,7 @@ class SQLPanelTestCase(BaseTestCase):
         """
 
         short_word = 'y' * 10
-        very_long_word = 'x' * (1024 * 1024)
+        very_long_word = 'x' * (1024 * 1024) #1MB
 
         #now set memory_limits
         import psutil
@@ -101,7 +101,7 @@ class SQLPanelTestCase(BaseTestCase):
         current_memory_limit = process.rlimit(memory_resource)
         current_soft, current_hard = current_memory_limit
 
-        leave_free_memory = 50 * 1024 * 1024 #20MB
+        leave_free_memory = 100 * 1024 * 1024 #100MB
         max_memory_limit = memory_usage+leave_free_memory
 
         #set soft memory limit
